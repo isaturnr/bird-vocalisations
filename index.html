@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>British Bird Vocalisation Library</title>
+<style>
+:root {
+  --green:#526b59;--green-dark:#344b3c;--green-light:#e8eee7;
+  --cream:#f7f6f0;--paper:#fffefa;--ink:#29342e;
+  --muted:#788078;--line:#e5e5dc;
+  --shadow:0 4px 18px rgba(38,55,43,.07);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--cream);color:var(--ink);font-family:Arial,Helvetica,sans-serif;line-height:1.55}
+button,input,textarea,select{font:inherit}
+button{cursor:pointer;border:0;border-radius:8px;padding:10px 15px;background:var(--green);color:white;font-weight:600}
+button:hover{filter:brightness(.94)}
+button.secondary{background:white;color:var(--green-dark);border:1px solid var(--line)}
+button.danger{background:#a64f49}
+button.small{padding:7px 11px;font-size:13px}
+button.text-button{background:transparent;color:var(--green);padding:5px 0}
+header{background:var(--green-dark);color:white;padding:20px 5%}
+.header-inner{max-width:1250px;margin:auto;display:flex;align-items:center;justify-content:space-between;gap:16px}
+.brand{display:flex;align-items:center;gap:13px}
+.brand-icon{width:43px;height:43px;flex:none}
+.brand h1{font-family:Georgia,serif;font-size:23px;margin:0;font-weight:normal}
+.brand p{margin:2px 0 0;color:#d5dfd5;font-size:12px}
+.header-actions{display:flex;gap:8px;flex-wrap:wrap}
+main{max-width:1250px;margin:32px auto;padding:0 24px 60px}
+.toolbar{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-bottom:25px;flex-wrap:wrap}
+.search{position:relative;flex:1;min-width:220px;max-width:480px}
+.search input{width:100%;padding:13px 15px 13px 40px;border:1px solid var(--line);border-radius:10px;background:white}
+.search:before{content:"⌕";position:absolute;left:14px;top:6px;font-size:23px;color:var(--muted)}
+.eyebrow{color:var(--green);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.4px}
+h2,h3,h4{font-family:Georgia,serif;font-weight:normal}
+h2{font-size:29px;margin:5px 0}
+h3{font-size:21px;margin:0 0 8px}
+.muted{color:var(--muted)}
+.species-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(235px,1fr));gap:19px}
+.species-card{background:var(--paper);border:1px solid var(--line);border-radius:13px;overflow:hidden;cursor:pointer;transition:transform .15s,box-shadow .15s}
+.species-card:hover{transform:translateY(-3px);box-shadow:var(--shadow)}
+.species-card img{width:100%;height:175px;object-fit:cover;display:block;background:#e7e9e1}
+.photo-placeholder{height:175px;display:flex;align-items:center;justify-content:center;background:var(--green-light);font-size:42px;color:var(--green)}
+.species-card-content{padding:17px}
+.species-card h3{margin:0 0 2px}
+.scientific{font-family:Georgia,serif;font-style:italic;color:var(--muted);font-size:14px}
+.species-meta{display:flex;gap:8px;align-items:center;margin-top:13px;flex-wrap:wrap}
+.tag{background:var(--green-light);color:var(--green-dark);padding:4px 8px;border-radius:5px;font-size:11px;font-weight:700}
+.count{font-size:12px;color:var(--muted)}
+.back{margin-bottom:20px}
+.species-hero{background:var(--paper);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:grid;grid-template-columns:minmax(220px,36%) 1fr;margin-bottom:27px}
+.species-hero img{width:100%;height:100%;min-height:240px;max-height:330px;object-fit:cover}
+.hero-placeholder{min-height:240px;background:var(--green-light);display:flex;align-items:center;justify-content:center}
+.hero-content{padding:27px}
+.hero-content h2{font-size:35px;margin:4px 0}
+.hero-content .scientific{font-size:16px}
+.hero-description{margin-top:15px;font-size:14px;color:#58635a}
+.hero-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px}
+.section-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:27px 0 14px}
+.section-heading h3{margin:0}
+.vocal-card{background:var(--paper);border:1px solid var(--line);border-radius:12px;margin-bottom:14px;overflow:hidden}
+.vocal-top{padding:17px 20px;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;border-bottom:1px solid var(--line)}
+.vocal-title{font-family:Georgia,serif;font-size:21px}
+.vocal-content{padding:20px}
+.vocal-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px 28px}
+.info-block{min-width:0}
+.info-block.full{grid-column:1/-1}
+.info-label{font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:6px}
+.info-text{white-space:pre-wrap;font-size:14px}
+.mnemonic{background:#f0f3ec;border-left:4px solid var(--green);padding:13px 16px;border-radius:5px;font-family:Georgia,serif;font-size:21px}
+.recording{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--line)}
+.recording:first-of-type{border-top:0}
+.recording audio{width:100%;max-width:470px;height:36px}
+.recording-name{font-weight:600;font-size:13px}
+.recording small{display:block;color:var(--muted);font-size:11px;overflow-wrap:anywhere}
+.recordings{margin-top:20px}
+.card-actions{display:flex;gap:7px}
+.form-panel{background:white;border:1px solid var(--line);border-radius:13px;padding:22px;margin:18px 0;box-shadow:var(--shadow)}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:15px}
+.field{display:flex;flex-direction:column;gap:6px}
+.field.full{grid-column:1/-1}
+.field label{font-size:12px;font-weight:700;color:#536057}
+.field input,.field textarea,.field select{width:100%;padding:10px 11px;border:1px solid #dcded6;border-radius:7px;background:#fffefa;color:var(--ink)}
+.field textarea{min-height:90px;resize:vertical}
+.field input:focus,.field textarea:focus,.field select:focus{outline:2px solid #c5d4c5;border-color:var(--green)}
+.field-note{font-size:11px;color:var(--muted)}
+.form-actions{display:flex;gap:8px;margin-top:18px;flex-wrap:wrap}
+.recording-form{border:1px solid var(--line);padding:14px;border-radius:8px;margin:10px 0;background:#fafaf6}
+.recording-form-grid{display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px}
+.empty{background:white;border:1px dashed #cbd2c8;border-radius:12px;padding:35px;text-align:center;color:var(--muted)}
+.audio-preview{font-size:12px;color:var(--green-dark);margin-top:5px}
+.hidden{display:none!important}
+footer{text-align:center;padding:25px;color:var(--muted);font-size:11px}
+@media(max-width:650px){
+  main{padding:0 14px;margin-top:22px}
+  .header-inner{align-items:flex-start;flex-direction:column}
+  .species-hero{grid-template-columns:1fr}
+  .species-hero img,.hero-placeholder{height:210px;min-height:210px}
+  .hero-content{padding:20px}
+  .vocal-grid,.form-grid{grid-template-columns:1fr}
+  .info-block.full,.field.full{grid-column:auto}
+  .recording{grid-template-columns:1fr}
+  .recording-form-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="header-inner">
+    <div class="brand">
+      <div class="brand-icon">
+        <svg viewBox="0 0 64 64" width="43" height="43" xmlns="http://www.w3.org/2000/svg" aria-label="Wader logo">
+          <circle cx="32" cy="32" r="31" fill="#e8eee7"/>
+          <path d="M8 46 Q20 42 31 46 T56 46" fill="none" stroke="#8da394" stroke-width="2"/>
+          <path d="M13 51 Q25 47 37 51 T55 51" fill="none" stroke="#8da394" stroke-width="1.5"/>
+          <path d="M14 35 Q22 27 31 25 Q38 23 43 27 Q47 30 44 35 Q39 41 29 40 Q20 40 14 35Z" fill="#344b3c"/>
+          <path d="M40 28 Q45 20 51 19 Q55 19 54 22 Q51 26 45 30Z" fill="#344b3c"/>
+          <path d="M53 21 L63 19 L54 24Z" fill="#526b59"/>
+          <path d="M25 39 L23 49 M34 39 L36 49" stroke="#344b3c" stroke-width="2" stroke-linecap="round"/>
+          <path d="M20 49 L26 49 M33 49 L39 49" stroke="#344b3c" stroke-width="1.5" stroke-linecap="round"/>
+          <path d="M17 35 Q24 28 33 29 Q28 35 22 37Z" fill="#526b59"/>
+        </svg>
+      </div>
+      <div>
+        <h1>British Bird Vocalisation Library</h1>
+        <p>A reference guide to the sounds of British birds</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="secondary small" onclick="exportBackup()">Export backup</button>
+      <button class="secondary small" onclick="document.getElementById('importFile').click()">Import backup</button>
+      <input id="importFile" type="file" accept=".json,application/json" hidden onchange="importBackup(event)">
+    </div>
+  </div>
+</header>
+
+
+<main id="app"></main>
+<footer>British Bird Vocalisation Library · Your personal field reference</footer>
+
+
+<script>
+const STORAGE_KEY = "birdDatabase";
+const AUDIO_DB_NAME = "birdDatabaseFiles";
+const AUDIO_STORE = "audio";
+const app = document.getElementById("app");
+
+
+let db = loadDatabase();
+let selectedSpecies = null;
+let editingVocalisation = null;
+let editingSpecies = false;
+let addingSpecies = false;
+let searchTerm = "";
+let audioObjectUrls = [];
+
+
+function uid() {
+  return "id-" + Date.now().toString(36) + Math.random().toString(36).slice(2,8);
+}
+function esc(value) {
+  return String(value ?? "").replace(/[&<>"']/g, c => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+  }[c]));
+}
+
+
+/* Audio files are stored separately in IndexedDB, rather than localStorage.
+   This allows larger recordings without filling the browser's small text-storage quota. */
+function openAudioDB() {
+  return new Promise((resolve,reject) => {
+    if (!("indexedDB" in window)) {
+      reject(new Error("This browser does not support IndexedDB."));
+      return;
+    }
+    const request = indexedDB.open(AUDIO_DB_NAME,1);
+    request.onupgradeneeded = () => {
+      const database = request.result;
+      if (!database.objectStoreNames.contains(AUDIO_STORE)) {
+        database.createObjectStore(AUDIO_STORE,{keyPath:"id"});
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+async function putAudioFile(id,file) {
+  const database = await openAudioDB();
+  return new Promise((resolve,reject) => {
+    const transaction = database.transaction(AUDIO_STORE,"readwrite");
+    transaction.objectStore(AUDIO_STORE).put({
+      id,blob:file,name:file.name || "audio recording",type:file.type || "audio/mpeg"
+    });
+    transaction.oncomplete = () => {database.close();resolve(id);};
+    transaction.onerror = () => {database.close();reject(transaction.error);};
+  });
+}
+async function getAudioFile(id) {
+  const database = await openAudioDB();
+  return new Promise((resolve,reject) => {
+    const request = database.transaction(AUDIO_STORE,"readonly").objectStore(AUDIO_STORE).get(id);
+    request.onsuccess = () => {database.close();resolve(request.result || null);};
+    request.onerror = () => {database.close();reject(request.error);};
+  });
+}
+async function deleteAudioFile(id) {
+  if (!id) return;
+  try {
+    const database = await openAudioDB();
+    await new Promise((resolve,reject) => {
+      const transaction = database.transaction(AUDIO_STORE,"readwrite");
+      transaction.objectStore(AUDIO_STORE).delete(id);
+      transaction.oncomplete = resolve;
+      transaction.onerror = () => reject(transaction.error);
+    });
+    database.close();
+  } catch(e) { console.warn("Could not delete stored audio",e); }
+}
+function revokeAudioUrls() {
+  audioObjectUrls.forEach(url => URL.revokeObjectURL(url));
+  audioObjectUrls = [];
+}
+function loadDatabase() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    if (saved) {
+      const list = Array.isArray(saved) ? saved : (saved.species || []);
+      return list.map(normaliseSpecies);
+    }
+  } catch(e) { console.warn("Could not load saved database",e); }
+  return [
+    starter("Marsh Tit","Poecile palustris","MT"),
+    starter("Blue Tit","Cyanistes caeruleus","BT"),
+    starter("Great Tit","Parus major","GT")
+  ];
+}
+function starter(name,scientificName,btoCode) {
+  return {id:uid(),name,scientificName,btoCode,habitat:"",photo:"",vocalisations:[]};
+}
+function normaliseSpecies(s) {
+  const vocalisations = s.vocalisations || s.vocalizations || [];
+  return {
+    id:s.id || uid(),
+    name:s.name || s.commonName || "Unnamed species",
+    scientificName:s.scientificName || s.scientific_name || "",
+    btoCode:s.btoCode || s.bto || s.code || "",
+    habitat:s.habitat || "",
+    photo:s.photo || s.image || "",
+    vocalisations:Array.isArray(vocalisations) ? vocalisations.map(normaliseVocalisation) : []
+  };
+}
+function normaliseVocalisation(v) {
+  let recordings = v.recordings || [];
+  if (!recordings.length && v.recordingUrls) {
+    recordings = String(v.recordingUrls).split(/\n/).filter(Boolean).map(url => ({url}));
+  }
+  if (!recordings.length && v.audioUrl) recordings = [{url:v.audioUrl}];
+  return {
+    id:v.id || uid(),
+    category:v.category || "Other",
+    name:v.name || v.title || "Untitled vocalisation",
+    description:v.description || "",
+    mnemonic:v.mnemonic || v.phoneticMnemonic || "",
+    variation:v.variation || "",
+    context:v.context || v.behaviour || v.behavior || "",
+    notes:v.notes || v.identificationNotes || "",
+    recordings:recordings.map(r => typeof r === "string" ? {url:r} : ({
+      url:r.url || r.audioUrl || "",
+      sourceUrl:r.sourceUrl || "",
+      audioId:r.audioId || "",
+      name:r.name || r.title || "",
+      start:r.start ?? r.startTime ?? "",
+      end:r.end ?? r.endTime ?? ""
+    }))
+  };
+}
+function save() {
+  try {
+    localStorage.setItem(STORAGE_KEY,JSON.stringify(db));
+  } catch(e) {
+    alert("The database could not be saved. Export a backup and consider using smaller photographs.");
+  }
+}
+function currentSpecies() {
+  return db.find(s => s.id === selectedSpecies);
+}
+function goHome() {
+  selectedSpecies = null;
+  editingVocalisation = null;
+  editingSpecies = false;
+  addingSpecies = false;
+  render();
+}
+function openSpecies(id) {
+  selectedSpecies = id;
+  editingVocalisation = null;
+  editingSpecies = false;
+  render();
+}
+function render() {
+  revokeAudioUrls();
+  if (!selectedSpecies) renderLibrary();
+  else renderSpecies();
+}
+function renderLibrary() {
+  const filtered = db.filter(s =>
+    [s.name,s.scientificName,s.btoCode].join(" ").toLowerCase().includes(searchTerm.toLowerCase())
+  );
+  app.innerHTML = `
+    <div class="toolbar">
+      <div>
+        <div class="eyebrow">Your reference library</div>
+        <h2>Bird species</h2>
+        <div class="muted">${db.length} species in your collection</div>
+      </div>
+      <button onclick="showSpeciesForm()">＋ Add species</button>
+    </div>
+    <div class="search">
+      <input placeholder="Search common name, scientific name or BTO..." value="${esc(searchTerm)}"
+        oninput="searchTerm=this.value;renderLibrary()">
+    </div>
+    ${addingSpecies ? speciesFormHTML() : ""}
+    <div style="height:20px"></div>
+    ${filtered.length ? `<div class="species-grid">${filtered.map(speciesCard).join("")}</div>`
+      : `<div class="empty">No species found. Try another search or add a species.</div>`}
+  `;
+}
+function speciesCard(s) {
+  return `<article class="species-card" onclick="openSpecies('${s.id}')">
+    ${s.photo ? `<img src="${s.photo}" alt="${esc(s.name)}">` : `<div class="photo-placeholder">♧</div>`}
+    <div class="species-card-content">
+      <h3>${esc(s.name)}</h3>
+      <div class="scientific">${esc(s.scientificName)}</div>
+      <div class="species-meta">
+        ${s.btoCode ? `<span class="tag">BTO: ${esc(s.btoCode)}</span>` : ""}
+        <span class="count">${s.vocalisations.length} vocalisation${s.vocalisations.length===1?"":"s"}</span>
+      </div>
+    </div>
+  </article>`;
+}
+function speciesFormHTML(s=null) {
+  return `<section class="form-panel">
+    <h3>${s ? "Edit species" : "Add a species"}</h3>
+    <form onsubmit="saveSpecies(event,'${s?.id || ""}')">
+      <div class="form-grid">
+        <div class="field"><label>Common name *</label>
+          <input name="name" required value="${esc(s?.name || "")}" placeholder="e.g. Blue Tit"></div>
+        <div class="field"><label>Scientific name</label>
+          <input name="scientificName" value="${esc(s?.scientificName || "")}" placeholder="e.g. Cyanistes caeruleus"></div>
+        <div class="field"><label>BTO:</label>
+          <input name="btoCode" value="${esc(s?.btoCode || "")}" placeholder="e.g. BT"></div>
+        <div class="field"><label>Habitat</label>
+          <input name="habitat" value="${esc(s?.habitat || "")}" placeholder="Typical habitats"></div>
+        <div class="field full"><label>Species photograph</label>
+          <input type="file" name="photo" accept="image/*" onchange="previewPhoto(event)">
+          <div class="field-note">Choose an image from your computer. It will be resized and stored in the database.</div>
+          <div id="photoPreview">${s?.photo ? `<img src="${s.photo}" style="max-width:180px;max-height:130px;border-radius:8px;margin-top:8px">` : ""}</div>
+          <input type="hidden" name="keepPhoto" value="${s?.photo ? "yes" : "no"}">
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="submit">Save species</button>
+        <button type="button" class="secondary" onclick="cancelSpeciesForm()">Cancel</button>
+      </div>
+    </form>
+  </section>`;
+}
+function showSpeciesForm() {addingSpecies=true;renderLibrary();}
+function cancelSpeciesForm() {addingSpecies=false;editingSpecies=false;render();}
+async function saveSpecies(event,id) {
+  event.preventDefault();
+  const form=event.target;
+  const data=new FormData(form);
+  let photo=data.get("keepPhoto")==="yes" ? (id ? db.find(s=>s.id===id)?.photo || "" : "") : "";
+  const file=form.elements.photo.files[0];
+  if(file) {
+    try {photo=await compressImage(file);}
+    catch(e) {alert("Could not read that photograph.");return;}
+  }
+  const fields={
+    name:data.get("name").trim(),
+    scientificName:data.get("scientificName").trim(),
+    btoCode:data.get("btoCode").trim(),
+    habitat:data.get("habitat").trim(),
+    photo
+  };
+  if(id) Object.assign(db.find(s=>s.id===id),fields);
+  else db.push({...starter(fields.name,fields.scientificName,fields.btoCode),...fields});
+  save();addingSpecies=false;editingSpecies=false;render();
+}
+async function compressImage(file) {
+  if(!file.type.startsWith("image/")) throw new Error("Please choose an image file.");
+  return new Promise((resolve,reject) => {
+    const reader=new FileReader();
+    reader.onerror=reject;
+    reader.onload=() => {
+      const img=new Image();
+      img.onerror=reject;
+      img.onload=() => {
+        const max=1200;
+        const scale=Math.min(1,max/Math.max(img.width,img.height));
+        const canvas=document.createElement("canvas");
+        canvas.width=Math.round(img.width*scale);
+        canvas.height=Math.round(img.height*scale);
+        canvas.getContext("2d").drawImage(img,0,0,canvas.width,canvas.height);
+        resolve(canvas.toDataURL("image/jpeg",0.78));
+      };
+      img.src=reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+async function previewPhoto(event) {
+  const file=event.target.files[0];
+  if(!file)return;
+  try {
+    const photo=await compressImage(file);
+    document.getElementById("photoPreview").innerHTML=
+      `<img src="${photo}" style="max-width:180px;max-height:130px;border-radius:8px;margin-top:8px">`;
+  } catch(e) {alert("Could not read that image.");}
+}
+function renderSpecies() {
+  const s=currentSpecies();
+  if(!s){goHome();return;}
+  const vocalHTML=s.vocalisations.length ? s.vocalisations.map(v=>vocalCard(v)).join("")
+    : `<div class="empty">No vocalisations added yet.<br>Add your first song or call to start building this species' profile.</div>`;
+  app.innerHTML=`
+    <button class="secondary small back" onclick="goHome()">← All species</button>
+    <section class="species-hero">
+      ${s.photo ? `<img src="${s.photo}" alt="${esc(s.name)}">` : `<div class="hero-placeholder">♧</div>`}
+      <div class="hero-content">
+        <div class="eyebrow">Species profile</div>
+        <h2>${esc(s.name)}</h2>
+        <div class="scientific">${esc(s.scientificName)}</div>
+        ${s.btoCode ? `<div style="margin-top:12px"><span class="tag">BTO: ${esc(s.btoCode)}</span></div>` : ""}
+        ${s.habitat ? `<div class="hero-description"><strong>Typical habitats</strong><br>${esc(s.habitat)}</div>` : ""}
+        <div class="hero-actions">
+          <button class="small" onclick="showVocalForm()">＋ Add vocalisation</button>
+          <button class="secondary small" onclick="editSpecies()">Edit species</button>
+          <button class="secondary small" onclick="deleteSpecies()">Delete species</button>
+        </div>
+      </div>
+    </section>
+    ${editingSpecies ? speciesFormHTML(s) : ""}
+    ${editingVocalisation==="new" || typeof editingVocalisation==="string"
+      ? vocalFormHTML(editingVocalisation==="new" ? null : s.vocalisations.find(v=>v.id===editingVocalisation))
+      : ""}
+    <div class="section-heading">
+      <div><div class="eyebrow">Species repertoire</div><h3>Vocalisations</h3></div>
+      <span class="count">${s.vocalisations.length} entr${s.vocalisations.length===1?"y":"ies"}</span>
+    </div>
+    ${vocalHTML}
+  `;
+  hydrateAudioPlayers(s);
+}
+function vocalCard(v) {
+  return `<article class="vocal-card">
+    <div class="vocal-top">
+      <div>
+        <span class="tag">${esc(v.category)}</span>
+        <div class="vocal-title" style="margin-top:8px">${esc(v.name)}</div>
+      </div>
+      <div class="card-actions">
+        <button class="secondary small" onclick="editVocalisation('${v.id}')">Edit</button>
+        <button class="secondary small" onclick="deleteVocalisation('${v.id}')">Delete</button>
+      </div>
+    </div>
+    <div class="vocal-content">
+      <div class="vocal-grid">
+        ${v.mnemonic ? `<div class="info-block full"><div class="info-label">Phonetic mnemonic</div><div class="mnemonic">${esc(v.mnemonic)}</div></div>` : ""}
+        ${v.description ? `<div class="info-block"><div class="info-label">Description</div><div class="info-text">${esc(v.description)}</div></div>` : ""}
+        ${v.variation ? `<div class="info-block"><div class="info-label">Variation</div><div class="info-text">${esc(v.variation)}</div></div>` : ""}
+        ${v.context ? `<div class="info-block"><div class="info-label">Context / behaviour</div><div class="info-text">${esc(v.context)}</div></div>` : ""}
+        ${v.notes ? `<div class="info-block"><div class="info-label">Identification notes</div><div class="info-text">${esc(v.notes)}</div></div>` : ""}
+      </div>
+      ${v.recordings.length ? `<div class="recordings"><div class="info-label">Recordings</div>
+        ${v.recordings.map((r,i)=>recordingHTML(r,i)).join("")}</div>` : ""}
+    </div>
+  </article>`;
+}
+function recordingHTML(r,i) {
+  const label=r.name || `Recording ${i+1}`;
+  const legacyClip=r.start!=="" || r.end!=="";
+  const audioSource=r.audioId ? "" : (r.url || "");
+  return `<div class="recording">
+    <div>
+      <div class="recording-name">${esc(label)}</div>
+      ${r.audioId
+        ? `<audio controls preload="metadata" data-audio-id="${esc(r.audioId)}"></audio>`
+        : audioSource
+          ? `<audio controls preload="metadata" data-start="${esc(r.start ?? "")}" data-end="${esc(r.end ?? "")}" src="${esc(audioSource)}"></audio>`
+          : `<div class="field-note">Audio file unavailable. You may need to re-import your backup.</div>`}
+      ${r.sourceUrl ? `<small>Source: <a href="${esc(r.sourceUrl)}" target="_blank" rel="noopener">Open original recording</a></small>` : ""}
+      ${!r.audioId && r.url ? `<small>${esc(r.url)}</small>` : ""}
+      ${legacyClip && !r.audioId ? `<small>Legacy clip: ${r.start!==""?formatTime(r.start):"Beginning"} – ${r.end!==""?formatTime(r.end):"End"}</small>` : ""}
+    </div>
+  </div>`;
+}
+async function hydrateAudioPlayers(s) {
+  const players=[...app.querySelectorAll("audio[data-audio-id]")];
+  for(const player of players) {
+    const id=player.dataset.audioId;
+    try {
+      const stored=await getAudioFile(id);
+      if(!stored || !stored.blob) {
+        player.insertAdjacentHTML("afterend",'<small>Stored audio file not found.</small>');
+        continue;
+      }
+      const url=URL.createObjectURL(stored.blob);
+      audioObjectUrls.push(url);
+      player.src=url;
+      player.load();
+    } catch(e) {
+      console.warn("Could not load audio file",e);
+      player.insertAdjacentHTML("afterend",'<small>Could not load this audio file.</small>');
+    }
+  }
+}
+function formatTime(seconds) {
+  seconds=Math.max(0,Number(seconds)||0);
+  const m=Math.floor(seconds/60),s=Math.floor(seconds%60);
+  return `${m}:${String(s).padStart(2,"0")}`;
+}
+function showVocalForm() {editingVocalisation="new";renderSpecies();}
+function editVocalisation(id) {editingVocalisation=id;renderSpecies();}
+function vocalFormHTML(v) {
+  const cats=["Song","Contact call","Alarm call","Flight call","Begging call","Juvenile call","Mobbing call","Other"];
+  const recordings=v?.recordings || [];
+  return `<section class="form-panel">
+    <h3>${v ? "Edit vocalisation" : "Add a vocalisation"}</h3>
+    <form onsubmit="saveVocalisation(event,'${v?.id || ""}')">
+      <div class="form-grid">
+        <div class="field"><label>Category *</label>
+          <select name="category" required>${cats.map(c=>`<option ${v?.category===c?"selected":""}>${c}</option>`).join("")}</select>
+        </div>
+        <div class="field"><label>Name / description title *</label>
+          <input name="name" required value="${esc(v?.name || "")}" placeholder="e.g. Typical song"></div>
+        <div class="field full"><label>Phonetic mnemonic</label>
+          <textarea name="mnemonic" placeholder="How would you write the sound phonetically?">${esc(v?.mnemonic || "")}</textarea></div>
+        <div class="field full"><label>Description</label>
+          <textarea name="description" placeholder="Describe what the vocalisation sounds like...">${esc(v?.description || "")}</textarea></div>
+        <div class="field full"><label>Variation</label>
+          <textarea name="variation" placeholder="How does it vary between individuals, situations or recordings?">${esc(v?.variation || "")}</textarea></div>
+        <div class="field full"><label>Context / behaviour</label>
+          <textarea name="context" placeholder="When and why is it used? What is the bird doing?">${esc(v?.context || "")}</textarea></div>
+        <div class="field full"><label>Identification notes</label>
+          <textarea name="notes" placeholder="Similar species, distinguishing features, useful observations...">${esc(v?.notes || "")}</textarea></div>
+      </div>
+      <div class="section-heading" style="margin-top:24px">
+        <div><h3>Audio recordings</h3><div class="field-note">Upload a downloaded and trimmed audio file. You can also keep the original Xeno-canto link as a source.</div></div>
+        <button type="button" class="secondary small" onclick="addRecordingRow()">＋ Add recording</button>
+      </div>
+      <div id="recordingRows">
+        ${recordings.map((r,i)=>recordingFormRow(r,i)).join("")}
+      </div>
+      <div class="form-actions">
+        <button type="submit">Save vocalisation</button>
+        <button type="button" class="secondary" onclick="editingVocalisation=null;renderSpecies()">Cancel</button>
+      </div>
+    </form>
+  </section>`;
+}
+function recordingFormRow(r={},i=0) {
+  return `<div class="recording-form">
+    <input type="hidden" name="recordingAudioId" value="${esc(r.audioId || "")}">
+    <input type="hidden" name="recordingOldUrl" value="${esc(r.url || "")}">
+    <div class="recording-form-grid">
+      <div class="field full">
+        <label>Upload trimmed audio file</label>
+        <input name="recordingFile" type="file" accept="audio/*,.mp3,.wav,.ogg,.m4a,.aac">
+        <div class="field-note">${r.audioId ? "An audio file is already saved. Choose a new file only if you want to replace it." : "Choose an audio file from your computer (MP3, WAV, M4A or OGG)."} </div>
+        ${r.audioId ? `<div class="audio-preview">✓ Existing uploaded audio is saved</div>` : ""}
+      </div>
+      <div class="field full"><label>Source URL (optional)</label>
+        <input name="recordingSourceUrl" type="url" value="${esc(r.sourceUrl || (!r.audioId ? r.url || "" : ""))}" placeholder="https://www.xeno-canto.org/..."></div>
+      <div class="field full"><label>Recording label (optional)</label>
+        <input name="recordingName" value="${esc(r.name || "")}" placeholder="e.g. Male song, dawn recording"></div>
+    </div>
+    <button type="button" class="text-button" onclick="this.closest('.recording-form').remove()">Remove recording</button>
+  </div>`;
+}
+function addRecordingRow() {
+  document.getElementById("recordingRows").insertAdjacentHTML("beforeend",recordingFormRow({}));
+}
+async function saveVocalisation(event,id) {
+  event.preventDefault();
+  const form=event.target;
+  const data=new FormData(form);
+  const rows=[...form.querySelectorAll(".recording-form")];
+  const recordings=[];
+  const newlyStoredIds=[];
+  try {
+    for(const row of rows) {
+      const file=row.querySelector('[name="recordingFile"]').files[0];
+      const oldAudioId=row.querySelector('[name="recordingAudioId"]').value;
+      const oldUrl=row.querySelector('[name="recordingOldUrl"]').value;
+      const sourceUrl=row.querySelector('[name="recordingSourceUrl"]').value.trim();
+      const name=row.querySelector('[name="recordingName"]').value.trim();
+      let audioId=oldAudioId;
+      if(file) {
+        if(!file.type.startsWith("audio/") && !/\.(mp3|wav|ogg|m4a|aac)$/i.test(file.name)) {
+          throw new Error("Please choose a recognised audio file.");
+        }
+        audioId=uid();
+        await putAudioFile(audioId,file);
+        newlyStoredIds.push(audioId);
+      }
+      const url=audioId ? "" : (sourceUrl || oldUrl);
+      if(audioId || url) {
+        recordings.push({
+          audioId,
+          url,
+          sourceUrl:sourceUrl || (audioId ? "" : url),
+          name,
+          start:"",
+          end:""
+        });
+      }
+    }
+  } catch(e) {
+    for(const newId of newlyStoredIds) await deleteAudioFile(newId);
+    alert(e.message || "There was a problem saving the audio file.");
+    return;
+  }
+
+
+  const v={
+    id:id || uid(),
+    category:data.get("category"),
+    name:data.get("name").trim(),
+    mnemonic:data.get("mnemonic").trim(),
+    description:data.get("description").trim(),
+    variation:data.get("variation").trim(),
+    context:data.get("context").trim(),
+    notes:data.get("notes").trim(),
+    recordings
+  };
+  const s=currentSpecies();
+  if(id) {
+    const index=s.vocalisations.findIndex(x=>x.id===id);
+    if(index>=0) {
+      const old=s.vocalisations[index];
+      const retained=new Set(recordings.map(r=>r.audioId).filter(Boolean));
+      for(const oldRecording of old.recordings || []) {
+        if(oldRecording.audioId && !retained.has(oldRecording.audioId)) {
+          await deleteAudioFile(oldRecording.audioId);
+        }
+      }
+      s.vocalisations[index]=v;
+    }
+  } else s.vocalisations.push(v);
+  save();
+  editingVocalisation=null;
+  renderSpecies();
+}
+function editSpecies() {editingSpecies=true;renderSpecies();}
+async function deleteSpecies() {
+  const s=currentSpecies();
+  if(!confirm(`Delete ${s.name} and all its vocalisations? This cannot be undone.`))return;
+  for(const v of s.vocalisations) {
+    for(const r of v.recordings || []) if(r.audioId) await deleteAudioFile(r.audioId);
+  }
+  db=db.filter(x=>x.id!==s.id);
+  save();goHome();
+}
+async function deleteVocalisation(id) {
+  const s=currentSpecies();
+  const v=s.vocalisations.find(x=>x.id===id);
+  if(!confirm(`Delete "${v.name}"?`))return;
+  for(const r of v.recordings || []) if(r.audioId) await deleteAudioFile(r.audioId);
+  s.vocalisations=s.vocalisations.filter(x=>x.id!==id);
+  save();renderSpecies();
+}
+function setupAudioClips() {
+  document.querySelectorAll("audio[data-start],audio[data-end]").forEach(audio=>{
+    if(audio.dataset.clipSetup)return;
+    audio.dataset.clipSetup="yes";
+    let initialised=false;
+    const start=audio.dataset.start==="" ? null : Number(audio.dataset.start);
+    const end=audio.dataset.end==="" ? null : Number(audio.dataset.end);
+    audio.addEventListener("play",()=>{
+      if(!initialised && start!==null) {
+        audio.currentTime=start;initialised=true;
+      }
+      if(end!==null && audio.currentTime>=end) audio.currentTime=start!==null?start:0;
+    });
+    audio.addEventListener("timeupdate",()=>{
+      if(end!==null && audio.currentTime>=end) {
+        audio.pause();audio.currentTime=end;
+      }
+    });
+    audio.addEventListener("seeked",()=>{
+      if(end!==null && audio.currentTime>end)audio.currentTime=end;
+    });
+    audio.addEventListener("ended",()=>{initialised=false;});
+  });
+}
+
+
+/* Convert a stored audio Blob to a data URL for portable JSON backups. */
+function blobToDataURL(blob) {
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>resolve(reader.result);
+    reader.onerror=()=>reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+function dataURLToBlob(dataURL) {
+  const parts=dataURL.split(",");
+  const mime=(parts[0].match(/:(.*?);/) || [,"application/octet-stream"])[1];
+  const binary=atob(parts[1]);
+  const bytes=new Uint8Array(binary.length);
+  for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
+  return new Blob([bytes],{type:mime});
+}
+async function exportBackup() {
+  try {
+    const backupSpecies=JSON.parse(JSON.stringify(db));
+    for(const s of backupSpecies) {
+      for(const v of s.vocalisations || []) {
+        for(const r of v.recordings || []) {
+          if(r.audioId) {
+            const stored=await getAudioFile(r.audioId);
+            if(stored?.blob) {
+              r.audioData=await blobToDataURL(stored.blob);
+              r.audioFileName=stored.name || "recording";
+              r.audioType=stored.type || stored.blob.type || "audio/mpeg";
+            } else {
+              throw new Error(`An audio file is missing from storage (${r.name || r.audioId}).`);
+            }
+          }
+        }
+      }
+    }
+    const backup={
+      format:"British Bird Vocalisation Library",
+      version:4,
+      exported:new Date().toISOString(),
+      species:backupSpecies
+    };
+    const blob=new Blob([JSON.stringify(backup,null,2)],{type:"application/json"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=url;
+    a.download="bird-database-backup.json";
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+  } catch(e) {
+    alert("Could not export the backup: " + e.message);
+  }
+}
+async function importBackup(event) {
+  const file=event.target.files[0];
+  if(!file)return;
+  try {
+    const text=await file.text();
+    const data=JSON.parse(text);
+    const list=Array.isArray(data)?data:data.species;
+    if(!Array.isArray(list))throw new Error("Invalid backup");
+    if(!confirm("Import this backup and replace the species currently in your database? Export your current database first if you want to keep it."))return;
+
+
+    const imported=list.map(normaliseSpecies);
+    for(let i=0;i<list.length;i++) {
+      const sourceSpecies=list[i];
+      const targetSpecies=imported[i];
+      const sourceVocalisations=sourceSpecies.vocalisations || sourceSpecies.vocalizations || [];
+      for(let j=0;j<sourceVocalisations.length;j++) {
+        const sourceRecordings=sourceVocalisations[j].recordings || [];
+        const targetRecordings=targetSpecies.vocalisations[j]?.recordings || [];
+        for(let k=0;k<sourceRecordings.length;k++) {
+          const sourceRecording=typeof sourceRecordings[k]==="string" ? {url:sourceRecordings[k]} : sourceRecordings[k];
+          const targetRecording=targetRecordings[k];
+          if(sourceRecording.audioData && targetRecording) {
+            const blob=dataURLToBlob(sourceRecording.audioData);
+            const audioId=uid();
+            await putAudioFile(audioId,new File([blob],sourceRecording.audioFileName || "recording",{
+              type:sourceRecording.audioType || blob.type || "audio/mpeg"
+            }));
+            targetRecording.audioId=audioId;
+            targetRecording.url="";
+            delete targetRecording.audioData;
+          }
+        }
+      }
+    }
+    db=imported;
+    save();
+    goHome();
+    alert("Backup imported successfully.");
+  } catch(e) {
+    console.error(e);
+    alert("That file could not be imported. It may not be a valid backup, or the browser may have run out of storage.");
+  } finally {
+    event.target.value="";
+  }
+}
+
+
+render();
+</script>
+<script>
+/* Retain support for older recordings that use start/end clip times. */
+const audioObserver=new MutationObserver(()=>setupAudioClips());
+audioObserver.observe(document.getElementById("app"),{childList:true,subtree:true});
+setupAudioClips();
+</script>
+</body>
+</html>
