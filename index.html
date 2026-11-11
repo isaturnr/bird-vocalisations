@@ -304,9 +304,6 @@ function render() {
   else renderSpecies();
 }
 function renderLibrary() {
-  const filtered = db.filter(s =>
-    [s.name,s.scientificName,s.btoCode].join(" ").toLowerCase().includes(searchTerm.toLowerCase())
-  );
   app.innerHTML = `
     <div class="toolbar">
       <div>
@@ -318,13 +315,24 @@ function renderLibrary() {
     </div>
     <div class="search">
       <input placeholder="Search common name, scientific name or BTO..." value="${esc(searchTerm)}"
-        oninput="searchTerm=this.value;renderLibrary()">
+        oninput="searchTerm=this.value;renderSpeciesGrid()">
     </div>
     ${addingSpecies ? speciesFormHTML() : ""}
     <div style="height:20px"></div>
-    ${filtered.length ? `<div class="species-grid">${filtered.map(speciesCard).join("")}</div>`
-      : `<div class="empty">No species found. Try another search or add a species.</div>`}
+    <div id="speciesList"></div>
   `;
+  renderSpeciesGrid();
+}
+ 
+function renderSpeciesGrid() {
+  const container = document.getElementById("speciesList");
+  if (!container) return;
+  const filtered = db.filter(s =>
+    [s.name, s.scientificName, s.btoCode].join(" ").toLowerCase().includes(searchTerm.toLowerCase())
+  );
+  container.innerHTML = filtered.length
+    ? `<div class="species-grid">${filtered.map(speciesCard).join("")}</div>`
+    : `<div class="empty">No species found. Try another search or add a species.</div>`;
 }
 function speciesCard(s) {
   return `<article class="species-card" onclick="openSpecies('${s.id}')">
