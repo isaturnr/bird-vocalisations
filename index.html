@@ -143,23 +143,15 @@ footer{text-align:center;padding:25px;color:var(--muted);font-size:11px}
 <!-- Firebase Cloud Firestore SDK (Compat CDN for standalone HTML) -->
 <script src="https://www.gstatic.com/firebasejs/11.0.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore-compat.js"></script>
-
+  
+<script src="config.js"></script>
+ 
 <script>
 const STORAGE_KEY = "birdDatabase";
 const AUDIO_DB_NAME = "birdDatabaseFiles";
 const AUDIO_STORE = "audio";
 const app = document.getElementById("app");
 const syncStatusEl = document.getElementById("syncStatus");
-
-/* Firebase configuration for bird-vocalisations */
-const firebaseConfig = {
-  apiKey: "AIzaSyAtpb4lMs8OTSyWkwtNIW35eSrmyJTFThY",
-  authDomain: "bird-vocalisations.firebaseapp.com",
-  projectId: "bird-vocalisations",
-  storageBucket: "bird-vocalisations.firebasestorage.app",
-  messagingSenderId: "48215509322",
-  appId: "1:48215509322:web:805c91081ea49890fc59b3"
-};
 
 let cloudDB = null;
 try {
