@@ -299,7 +299,7 @@ async function putAudioFile(id,file) {
         type: file.type || "audio/mpeg",
         updatedAt: Date.now()
       });
-      setSyncStatus("● Cloud synced");
+      setSyncStatus("● Online");
     } catch(e) {
       console.warn("Could not upload audio to Firestore (ensure file is under 700 KB)", e);
       setSyncStatus("⚠ Audio sync error");
@@ -430,12 +430,12 @@ function save(changedSpeciesId = null) {
     const sp = db.find(s => s.id === changedSpeciesId);
     if (sp) {
       cloudDB.collection("species").doc(sp.id).set(JSON.parse(JSON.stringify(sp)))
-        .then(() => setSyncStatus("● Cloud synced"))
+        .then(() => setSyncStatus("● Online"))
         .catch(e => { console.warn(e); setSyncStatus("⚠ Sync error"); });
     }
   } else {
     Promise.all(db.map(sp => cloudDB.collection("species").doc(sp.id).set(JSON.parse(JSON.stringify(sp)))))
-      .then(() => setSyncStatus("● Cloud synced"))
+      .then(() => setSyncStatus("● Online"))
       .catch(e => { console.warn(e); setSyncStatus("⚠ Sync error"); });
   }
 }
@@ -464,7 +464,7 @@ async function uploadAllLocalToCloud() {
       }
     }
   }
-  setSyncStatus("● Cloud synced");
+  setSyncStatus("● Online");
 }
 
 function initCloudSync() {
@@ -491,7 +491,7 @@ function initCloudSync() {
         render();
       }
     }
-    setSyncStatus("● Cloud synced");
+    setSyncStatus("● Online");
   }, err => {
     console.warn("Firestore listener error", err);
     setSyncStatus("Offline / Local");
@@ -1185,7 +1185,7 @@ async function importWordDoc(event) {
   } catch (e) {
     console.error(e);
     alert("Could not import Word document: " + e.message);
-    setSyncStatus("● Cloud synced");
+    setSyncStatus("● Online");
   } finally {
     event.target.value = "";
   }
