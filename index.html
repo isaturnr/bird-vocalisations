@@ -295,7 +295,7 @@ async function putAudioFile(id,file) {
         type: file.type || "audio/mpeg",
         updatedAt: Date.now()
       });
-      setSyncStatus("● Cloud synced");
+      setSyncStatus("● Online");
     } catch(e) {
       console.warn("Could not upload audio to Firestore (ensure file is under 700 KB)", e);
       setSyncStatus("⚠ Audio sync error");
@@ -465,7 +465,7 @@ async function uploadAllLocalToCloud() {
 
 function initCloudSync() {
   if (!cloudDB) {
-    setSyncStatus("Offline mode");
+    setSyncStatus("Offline");
     return;
   }
   let firstSnapshot = true;
