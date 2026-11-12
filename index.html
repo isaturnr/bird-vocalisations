@@ -69,6 +69,8 @@ h3{font-size:21px;margin:0 0 8px}
 .info-block.full{grid-column:1/-1}
 .info-label{font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:6px}
 .info-text{white-space:pre-wrap;font-size:14px}
+.species-link{color:var(--green-dark);font-weight:700;text-decoration:underline;text-decoration-color:#8da394;text-underline-offset:2px;cursor:pointer;background:var(--green-light);padding:1px 5px;border-radius:4px}
+.species-link:hover{background:#d5e0d4}
 .mnemonic{background:#f0f3ec;border-left:4px solid var(--green);padding:13px 16px;border-radius:5px;font-family:Georgia,serif;font-size:21px}
 .recording{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--line)}
 .recording:first-of-type{border-top:0}
@@ -207,6 +209,45 @@ function esc(value) {
   return String(value ?? "").replace(/[&<>"']/g, c => ({
     "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
   }[c]));
+}
+
+/* Automatically turn mentions of other species in the database into clickable links */
+function linkifySpecies(text, currentSpeciesId) {
+  let escaped = esc(text);
+  if (!escaped) return "";
+
+  const candidates = [];
+  db.forEach(s => {
+    if (s.id === currentSpeciesId) return;
+    if (s.name && s.name.trim().length > 2) {
+      candidates.push({ term: s.name.trim(), id: s.id, name: s.name });
+    }
+    if (s.btoCode && s.btoCode.trim().length >= 2) {
+      candidates.push({ term: s.btoCode.trim(), id: s.id, name: s.name, isBto: true });
+    }
+  });
+
+  candidates.sort((a, b) => b.term.length - a.term.length);
+
+  const tokens = [];
+  candidates.forEach(c => {
+    const safeTerm = esc(c.term).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = c.isBto
+      ? new RegExp(`\\b(${safeTerm})\\b`, 'g')
+      : new RegExp(`\\b(${safeTerm}s?)\\b`, 'gi');
+
+    escaped = escaped.replace(regex, match => {
+      const placeholder = `@@SPECIESLINK_${tokens.length}@@`;
+      tokens.push(`<a class="species-link" title="Open ${esc(c.name)}" onclick="openSpecies('${c.id}');window.scrollTo({top:0,behavior:'smooth'})">${match}</a>`);
+      return placeholder;
+    });
+  });
+
+  tokens.forEach((html, idx) => {
+    escaped = escaped.replace(`@@SPECIESLINK_${idx}@@`, html);
+  });
+
+  return escaped;
 }
 
 /* Audio files are stored locally in IndexedDB and mirrored to Firestore. */
@@ -608,7 +649,7 @@ async function previewPhoto(event) {
 function renderSpecies() {
   const s=currentSpecies();
   if(!s){goHome();return;}
-  const vocalHTML=s.vocalisations.length ? s.vocalisations.map((v, idx)=>vocalCard(v, idx, s.vocalisations.length)).join("")
+  const vocalHTML=s.vocalisations.length ? s.vocalisations.map((v, idx)=>vocalCard(v, idx, s.vocalisations.length, s.id)).join("")
     : `<div class="empty">No vocalisations added yet.<br>Add your first song or call to start building this species' profile.</div>`;
   app.innerHTML=`
     <button class="secondary small back" onclick="goHome()">← All species</button>
@@ -640,7 +681,7 @@ function renderSpecies() {
   hydrateAudioPlayers(s);
   setupExclusiveAudio();
 }
-function vocalCard(v, idx, total) {
+function vocalCard(v, idx, total, speciesId) {
   return `<article class="vocal-card">
     <div class="vocal-top">
       <div>
@@ -657,10 +698,10 @@ function vocalCard(v, idx, total) {
     <div class="vocal-content">
       <div class="vocal-grid">
         ${v.mnemonic ? `<div class="info-block full"><div class="info-label">Phonetic mnemonic</div><div class="mnemonic">${esc(v.mnemonic)}</div></div>` : ""}
-        ${v.description ? `<div class="info-block"><div class="info-label">Description</div><div class="info-text">${esc(v.description)}</div></div>` : ""}
-        ${v.variation ? `<div class="info-block"><div class="info-label">Variation</div><div class="info-text">${esc(v.variation)}</div></div>` : ""}
-        ${v.context ? `<div class="info-block"><div class="info-label">Context / behaviour</div><div class="info-text">${esc(v.context)}</div></div>` : ""}
-        ${v.notes ? `<div class="info-block"><div class="info-label">Identification notes</div><div class="info-text">${esc(v.notes)}</div></div>` : ""}
+        ${v.description ? `<div class="info-block"><div class="info-label">Description</div><div class="info-text">${linkifySpecies(v.description, speciesId)}</div></div>` : ""}
+        ${v.variation ? `<div class="info-block"><div class="info-label">Variation</div><div class="info-text">${linkifySpecies(v.variation, speciesId)}</div></div>` : ""}
+        ${v.context ? `<div class="info-block"><div class="info-label">Context / behaviour</div><div class="info-text">${linkifySpecies(v.context, speciesId)}</div></div>` : ""}
+        ${v.notes ? `<div class="info-block"><div class="info-label">Identification notes</div><div class="info-text">${linkifySpecies(v.notes, speciesId)}</div></div>` : ""}
       </div>
       ${v.recordings.length ? `<div class="recordings"><div class="info-label">Recordings</div>
         ${v.recordings.map((r,i)=>recordingHTML(r,i)).join("")}</div>` : ""}
