@@ -26,7 +26,8 @@ header{background:var(--green-dark);color:white;padding:20px 5%}
 .brand-icon{width:43px;height:43px;flex:none}
 .brand h1{font-family:Georgia,serif;font-size:23px;margin:0;font-weight:normal}
 .brand p{margin:2px 0 0;color:#d5dfd5;font-size:12px}
-.header-actions{display:flex;gap:8px;flex-wrap:wrap}
+.header-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.sync-pill{font-size:12px;color:#d5dfd5;padding:4px 8px;border-radius:6px;background:rgba(255,255,255,.1)}
 main{max-width:1250px;margin:32px auto;padding:0 24px 60px}
 .toolbar{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-bottom:25px;flex-wrap:wrap}
 .search{position:relative;flex:1;min-width:220px;max-width:480px}
@@ -128,6 +129,7 @@ footer{text-align:center;padding:25px;color:var(--muted);font-size:11px}
       </div>
     </div>
     <div class="header-actions">
+      <span id="syncStatus" class="sync-pill">Connecting…</span>
       <button class="secondary small" onclick="exportBackup()">Export backup</button>
       <button class="secondary small" onclick="document.getElementById('importFile').click()">Import backup</button>
       <input id="importFile" type="file" accept=".json,application/json" hidden onchange="importBackup(event)">
@@ -135,17 +137,42 @@ footer{text-align:center;padding:25px;color:var(--muted);font-size:11px}
   </div>
 </header>
 
-
 <main id="app"></main>
 <footer>British Bird Vocalisation Library · Your personal field reference</footer>
 
+<!-- Firebase Cloud Firestore SDK (Compat CDN for standalone HTML) -->
+<script src="https://www.gstatic.com/firebasejs/11.0.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore-compat.js"></script>
 
 <script>
 const STORAGE_KEY = "birdDatabase";
 const AUDIO_DB_NAME = "birdDatabaseFiles";
 const AUDIO_STORE = "audio";
 const app = document.getElementById("app");
+const syncStatusEl = document.getElementById("syncStatus");
 
+/* Firebase configuration for bird-vocalisations */
+const firebaseConfig = {
+  apiKey: "AIzaSyAtpb4lMs8OTSyWkwtNIW35eSrmyJTFThY",
+  authDomain: "bird-vocalisations.firebaseapp.com",
+  projectId: "bird-vocalisations",
+  storageBucket: "bird-vocalisations.firebasestorage.app",
+  messagingSenderId: "48215509322",
+  appId: "1:48215509322:web:805c91081ea49890fc59b3"
+};
+
+let cloudDB = null;
+try {
+  firebase.initializeApp(firebaseConfig);
+  cloudDB = firebase.firestore();
+  cloudDB.enablePersistence({ synchronizeTabs: true }).catch(() => {});
+} catch(e) {
+  console.warn("Firebase initialisation failed; running in local-only mode.", e);
+}
+
+function setSyncStatus(text) {
+  if (syncStatusEl) syncStatusEl.textContent = text;
+}
 
 let db = loadDatabase();
 let selectedSpecies = null;
@@ -154,7 +181,6 @@ let editingSpecies = false;
 let addingSpecies = false;
 let searchTerm = "";
 let audioObjectUrls = [];
-
 
 function uid() {
   return "id-" + Date.now().toString(36) + Math.random().toString(36).slice(2,8);
@@ -165,9 +191,7 @@ function esc(value) {
   }[c]));
 }
 
-
-/* Audio files are stored separately in IndexedDB, rather than localStorage.
-   This allows larger recordings without filling the browser's small text-storage quota. */
+/* Audio files are stored locally in IndexedDB and mirrored to Firestore. */
 function openAudioDB() {
   return new Promise((resolve,reject) => {
     if (!("indexedDB" in window)) {
@@ -185,24 +209,68 @@ function openAudioDB() {
     request.onerror = () => reject(request.error);
   });
 }
-async function putAudioFile(id,file) {
+async function putAudioFileLocal(id,file,nameOverride,typeOverride) {
   const database = await openAudioDB();
   return new Promise((resolve,reject) => {
     const transaction = database.transaction(AUDIO_STORE,"readwrite");
     transaction.objectStore(AUDIO_STORE).put({
-      id,blob:file,name:file.name || "audio recording",type:file.type || "audio/mpeg"
+      id,
+      blob:file,
+      name:nameOverride || file.name || "audio recording",
+      type:typeOverride || file.type || "audio/mpeg"
     });
     transaction.oncomplete = () => {database.close();resolve(id);};
     transaction.onerror = () => {database.close();reject(transaction.error);};
   });
 }
-async function getAudioFile(id) {
+async function putAudioFile(id,file) {
+  await putAudioFileLocal(id,file);
+  if (cloudDB) {
+    try {
+      setSyncStatus("Uploading audio…");
+      const audioData = await blobToDataURL(file);
+      await cloudDB.collection("audio").doc(id).set({
+        id,
+        audioData,
+        name: file.name || "audio recording",
+        type: file.type || "audio/mpeg",
+        updatedAt: Date.now()
+      });
+      setSyncStatus("● Cloud synced");
+    } catch(e) {
+      console.warn("Could not upload audio to Firestore (ensure file is under 700 KB)", e);
+      setSyncStatus("⚠ Audio sync error");
+    }
+  }
+  return id;
+}
+async function getAudioFileLocal(id) {
   const database = await openAudioDB();
   return new Promise((resolve,reject) => {
     const request = database.transaction(AUDIO_STORE,"readonly").objectStore(AUDIO_STORE).get(id);
     request.onsuccess = () => {database.close();resolve(request.result || null);};
     request.onerror = () => {database.close();reject(request.error);};
   });
+}
+async function getAudioFile(id) {
+  const local = await getAudioFileLocal(id);
+  if (local && local.blob) return local;
+  if (cloudDB) {
+    try {
+      const docSnap = await cloudDB.collection("audio").doc(id).get();
+      if (docSnap.exists) {
+        const data = docSnap.data();
+        if (data && data.audioData) {
+          const blob = dataURLToBlob(data.audioData);
+          await putAudioFileLocal(id, blob, data.name, data.type);
+          return { id, blob, name: data.name, type: data.type };
+        }
+      }
+    } catch(e) {
+      console.warn("Could not fetch audio from Firestore", e);
+    }
+  }
+  return null;
 }
 async function deleteAudioFile(id) {
   if (!id) return;
@@ -216,6 +284,9 @@ async function deleteAudioFile(id) {
     });
     database.close();
   } catch(e) { console.warn("Could not delete stored audio",e); }
+  if (cloudDB) {
+    cloudDB.collection("audio").doc(id).delete().catch(e => console.warn("Cloud audio delete failed", e));
+  }
 }
 function revokeAudioUrls() {
   audioObjectUrls.forEach(url => URL.revokeObjectURL(url));
@@ -275,13 +346,88 @@ function normaliseVocalisation(v) {
     }))
   };
 }
-function save() {
+function saveLocal() {
   try {
     localStorage.setItem(STORAGE_KEY,JSON.stringify(db));
   } catch(e) {
-    alert("The database could not be saved. Export a backup and consider using smaller photographs.");
+    console.warn("Local storage quota reached", e);
   }
 }
+function save(changedSpeciesId = null) {
+  saveLocal();
+  if (!cloudDB) return;
+  setSyncStatus("Syncing…");
+  if (changedSpeciesId) {
+    const sp = db.find(s => s.id === changedSpeciesId);
+    if (sp) {
+      cloudDB.collection("species").doc(sp.id).set(JSON.parse(JSON.stringify(sp)))
+        .then(() => setSyncStatus("● Cloud synced"))
+        .catch(e => { console.warn(e); setSyncStatus("⚠ Sync error"); });
+    }
+  } else {
+    Promise.all(db.map(sp => cloudDB.collection("species").doc(sp.id).set(JSON.parse(JSON.stringify(sp)))))
+      .then(() => setSyncStatus("● Cloud synced"))
+      .catch(e => { console.warn(e); setSyncStatus("⚠ Sync error"); });
+  }
+}
+
+/* Push local species + audio to Firestore if cloud database is brand new */
+async function uploadAllLocalToCloud() {
+  if (!cloudDB) return;
+  setSyncStatus("Initial cloud upload…");
+  for (const sp of db) {
+    await cloudDB.collection("species").doc(sp.id).set(JSON.parse(JSON.stringify(sp)));
+    for (const v of sp.vocalisations || []) {
+      for (const r of v.recordings || []) {
+        if (r.audioId) {
+          const localAudio = await getAudioFileLocal(r.audioId);
+          if (localAudio && localAudio.blob) {
+            const audioData = await blobToDataURL(localAudio.blob);
+            await cloudDB.collection("audio").doc(r.audioId).set({
+              id: r.audioId,
+              audioData,
+              name: localAudio.name || "audio recording",
+              type: localAudio.type || localAudio.blob.type || "audio/mpeg",
+              updatedAt: Date.now()
+            });
+          }
+        }
+      }
+    }
+  }
+  setSyncStatus("● Cloud synced");
+}
+
+function initCloudSync() {
+  if (!cloudDB) {
+    setSyncStatus("Offline mode");
+    return;
+  }
+  let firstSnapshot = true;
+  cloudDB.collection("species").onSnapshot(snapshot => {
+    if (firstSnapshot) {
+      firstSnapshot = false;
+      if (snapshot.empty && db.length > 0) {
+        uploadAllLocalToCloud();
+        return;
+      }
+    }
+    const cloudSpecies = [];
+    snapshot.forEach(doc => cloudSpecies.push(normaliseSpecies(doc.data())));
+    if (cloudSpecies.length > 0 || !snapshot.empty) {
+      db = cloudSpecies;
+      saveLocal();
+      if (!addingSpecies && !editingSpecies && !editingVocalisation) {
+        render();
+      }
+    }
+    setSyncStatus("● Cloud synced");
+  }, err => {
+    console.warn("Firestore listener error", err);
+    setSyncStatus("Offline / Local");
+  });
+}
+
 function currentSpecies() {
   return db.find(s => s.id === selectedSpecies);
 }
@@ -393,9 +539,15 @@ async function saveSpecies(event,id) {
     habitat:data.get("habitat").trim(),
     photo
   };
-  if(id) Object.assign(db.find(s=>s.id===id),fields);
-  else db.push({...starter(fields.name,fields.scientificName,fields.btoCode),...fields});
-  save();addingSpecies=false;editingSpecies=false;render();
+  let targetId = id;
+  if(id) {
+    Object.assign(db.find(s=>s.id===id),fields);
+  } else {
+    const created = {...starter(fields.name,fields.scientificName,fields.btoCode),...fields};
+    targetId = created.id;
+    db.push(created);
+  }
+  save(targetId);addingSpecies=false;editingSpecies=false;render();
 }
 async function compressImage(file) {
   if(!file.type.startsWith("image/")) throw new Error("Please choose an image file.");
@@ -556,7 +708,7 @@ function vocalFormHTML(v) {
           <textarea name="notes" placeholder="Similar species, distinguishing features, useful observations...">${esc(v?.notes || "")}</textarea></div>
       </div>
       <div class="section-heading" style="margin-top:24px">
-        <div><h3>Audio recordings</h3><div class="field-note">Upload a downloaded and trimmed audio file. You can also keep the original Xeno-canto link as a source.</div></div>
+        <div><h3>Audio recordings</h3><div class="field-note">Upload a downloaded and trimmed audio file (under 700 KB for cloud sync). You can also keep the original Xeno-canto link as a source.</div></div>
         <button type="button" class="secondary small" onclick="addRecordingRow()">＋ Add recording</button>
       </div>
       <div id="recordingRows">
@@ -632,7 +784,6 @@ async function saveVocalisation(event,id) {
     return;
   }
 
-
   const v={
     id:id || uid(),
     category:data.get("category"),
@@ -658,7 +809,7 @@ async function saveVocalisation(event,id) {
       s.vocalisations[index]=v;
     }
   } else s.vocalisations.push(v);
-  save();
+  save(s.id);
   editingVocalisation=null;
   renderSpecies();
 }
@@ -670,7 +821,11 @@ async function deleteSpecies() {
     for(const r of v.recordings || []) if(r.audioId) await deleteAudioFile(r.audioId);
   }
   db=db.filter(x=>x.id!==s.id);
-  save();goHome();
+  saveLocal();
+  if (cloudDB) {
+    cloudDB.collection("species").doc(s.id).delete().catch(e => console.warn(e));
+  }
+  goHome();
 }
 async function deleteVocalisation(id) {
   const s=currentSpecies();
@@ -678,7 +833,7 @@ async function deleteVocalisation(id) {
   if(!confirm(`Delete "${v.name}"?`))return;
   for(const r of v.recordings || []) if(r.audioId) await deleteAudioFile(r.audioId);
   s.vocalisations=s.vocalisations.filter(x=>x.id!==id);
-  save();renderSpecies();
+  save(s.id);renderSpecies();
 }
 function setupAudioClips() {
   document.querySelectorAll("audio[data-start],audio[data-end]").forEach(audio=>{
@@ -705,8 +860,7 @@ function setupAudioClips() {
   });
 }
 
-
-/* Convert a stored audio Blob to a data URL for portable JSON backups. */
+/* Convert a stored audio Blob to a data URL for portable JSON backups and cloud sync. */
 function blobToDataURL(blob) {
   return new Promise((resolve,reject)=>{
     const reader=new FileReader();
@@ -769,7 +923,6 @@ async function importBackup(event) {
     if(!Array.isArray(list))throw new Error("Invalid backup");
     if(!confirm("Import this backup and replace the species currently in your database? Export your current database first if you want to keep it."))return;
 
-
     const imported=list.map(normaliseSpecies);
     for(let i=0;i<list.length;i++) {
       const sourceSpecies=list[i];
@@ -794,10 +947,17 @@ async function importBackup(event) {
         }
       }
     }
+    if (cloudDB) {
+      const existing = await cloudDB.collection("species").get();
+      const newIds = new Set(imported.map(s => s.id));
+      for (const docSnap of existing.docs) {
+        if (!newIds.has(docSnap.id)) await docSnap.ref.delete();
+      }
+    }
     db=imported;
     save();
     goHome();
-    alert("Backup imported successfully.");
+    alert("Backup imported and synced to the cloud.");
   } catch(e) {
     console.error(e);
     alert("That file could not be imported. It may not be a valid backup, or the browser may have run out of storage.");
@@ -806,8 +966,8 @@ async function importBackup(event) {
   }
 }
 
-
 render();
+initCloudSync();
 </script>
 <script>
 /* Retain support for older recordings that use start/end clip times. */
