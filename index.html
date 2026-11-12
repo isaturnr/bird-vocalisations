@@ -148,7 +148,7 @@ body:not(.edit-mode) .form-panel {
 </header>
 
 <main id="app"></main>
-<footer>British Bird Vocalisation Library · Your personal field reference</footer>
+<footer>British Bird Vocalisation Library · A field reference guide</footer>
 
 <!-- Firebase Cloud Firestore SDK (Compat CDN for standalone HTML) -->
 <script src="https://www.gstatic.com/firebasejs/11.0.0/firebase-app-compat.js"></script>
@@ -478,9 +478,9 @@ function renderLibrary() {
   app.innerHTML = `
     <div class="toolbar">
       <div>
-        <div class="eyebrow">Your reference library</div>
+        <div class="eyebrow">Reference library</div>
         <h2>Bird species</h2>
-        <div class="muted">${db.length} species in your collection </div>
+        <div class="muted">${db.length} species in the collection </div>
       </div>
       <button onclick="showSpeciesForm()">＋ Add species</button>
     </div>
