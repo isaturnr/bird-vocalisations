@@ -480,12 +480,12 @@ function renderLibrary() {
       <div>
         <div class="eyebrow">Your reference library</div>
         <h2>Bird species</h2>
-        <div class="muted">${db.length} species in your collection (alphabetical)</div>
+        <div class="muted">${db.length} species in your collection </div>
       </div>
       <button onclick="showSpeciesForm()">＋ Add species</button>
     </div>
     <div class="search">
-      <input placeholder="Search common name, scientific name or BTO..." value="${esc(searchTerm)}"
+      <input placeholder="Search common name, scientific name or BTO code..." value="${esc(searchTerm)}"
         oninput="searchTerm=this.value;renderSpeciesGrid()">
     </div>
     ${addingSpecies ? speciesFormHTML() : ""}
