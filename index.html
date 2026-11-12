@@ -374,7 +374,7 @@ function loadDatabase() {
   return initial;
 }
 function starter(name,scientificName,btoCode) {
-  return {id:uid(),name,scientificName,btoCode,habitat:"",photo:"",vocalisations:[]};
+  return {id:uid(),name,scientificName,btoCode,habitat:"",photo:"",photoSourceUrl:"",vocalisations:[]};
 }
 function normaliseSpecies(s) {
   const vocalisations = s.vocalisations || s.vocalizations || [];
@@ -385,6 +385,7 @@ function normaliseSpecies(s) {
     btoCode:s.btoCode || s.bto || s.code || "",
     habitat:s.habitat || "",
     photo:s.photo || s.image || "",
+    photoSourceUrl:s.photoSourceUrl || "",
     vocalisations:Array.isArray(vocalisations) ? vocalisations.map(normaliseVocalisation) : []
   };
 }
@@ -582,6 +583,9 @@ function speciesFormHTML(s=null) {
           <div id="photoPreview">${s?.photo ? `<img src="${s.photo}" style="max-width:180px;max-height:130px;border-radius:8px;margin-top:8px">` : ""}</div>
           <input type="hidden" name="keepPhoto" value="${s?.photo ? "yes" : "no"}">
         </div>
+        <div class="field full"><label>Photo source URL (optional)</label>
+          <input type="url" name="photoSourceUrl" value="${esc(s?.photoSourceUrl || "")}" placeholder="https://commons.wikimedia.org/wiki/File:...">
+        </div>
       </div>
       <div class="form-actions">
         <button type="submit">Save species</button>
@@ -607,7 +611,8 @@ async function saveSpecies(event,id) {
     scientificName:data.get("scientificName").trim(),
     btoCode:data.get("btoCode").trim(),
     habitat:data.get("habitat").trim(),
-    photo
+    photo,
+    photoSourceUrl:data.get("photoSourceUrl").trim()
   };
   let targetId = id;
   if(id) {
@@ -665,6 +670,7 @@ function renderSpecies() {
         <div class="scientific">${esc(s.scientificName)}</div>
         ${s.btoCode ? `<div style="margin-top:12px"><span class="tag">BTO: ${esc(s.btoCode)}</span></div>` : ""}
         ${s.habitat ? `<div class="hero-description"><strong>Typical habitats</strong><br>${esc(s.habitat)}</div>` : ""}
+        ${s.photoSourceUrl ? `<div class="field-note" style="margin-top:10px">Photo source: <a href="${esc(s.photoSourceUrl)}" target="_blank" rel="noopener">View original image</a></div>` : ""}
         <div class="hero-actions">
           <button class="small" onclick="showVocalForm()">＋ Add vocalisation</button>
           <button class="secondary small" onclick="editSpecies()">Edit species</button>
@@ -1172,6 +1178,7 @@ async function importWordDoc(event) {
           btoCode,
           habitat,
           photo,
+          photoSourceUrl: "",
           vocalisations: newVocalisations
         });
         added++;
