@@ -93,6 +93,16 @@ h3{font-size:21px;margin:0 0 8px}
 .audio-preview{font-size:12px;color:var(--green-dark);margin-top:5px}
 .hidden{display:none!important}
 footer{text-align:center;padding:25px;color:var(--muted);font-size:11px}
+
+/* Read-only mode by default; append ?edit=true to URL to show editing controls */
+body:not(.edit-mode) .header-actions button,
+body:not(.edit-mode) .toolbar button,
+body:not(.edit-mode) .hero-actions,
+body:not(.edit-mode) .card-actions,
+body:not(.edit-mode) .form-panel {
+  display: none !important;
+}
+
 @media(max-width:650px){
   main{padding:0 14px;margin-top:22px}
   .header-inner{align-items:flex-start;flex-direction:column}
@@ -150,6 +160,10 @@ const AUDIO_DB_NAME = "birdDatabaseFiles";
 const AUDIO_STORE = "audio";
 const app = document.getElementById("app");
 const syncStatusEl = document.getElementById("syncStatus");
+
+if (new URLSearchParams(window.location.search).get("edit") === "true") {
+  document.body.classList.add("edit-mode");
+}
 
 /* Firebase configuration for bird-vocalisations */
 const firebaseConfig = {
