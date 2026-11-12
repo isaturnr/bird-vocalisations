@@ -426,12 +426,12 @@ function save(changedSpeciesId = null) {
     const sp = db.find(s => s.id === changedSpeciesId);
     if (sp) {
       cloudDB.collection("species").doc(sp.id).set(JSON.parse(JSON.stringify(sp)))
-        .then(() => setSyncStatus("● Cloud synced"))
+        .then(() => setSyncStatus("● Online"))
         .catch(e => { console.warn(e); setSyncStatus("⚠ Sync error"); });
     }
   } else {
     Promise.all(db.map(sp => cloudDB.collection("species").doc(sp.id).set(JSON.parse(JSON.stringify(sp)))))
-      .then(() => setSyncStatus("● Cloud synced"))
+      .then(() => setSyncStatus("● Online"))
       .catch(e => { console.warn(e); setSyncStatus("⚠ Sync error"); });
   }
 }
@@ -460,7 +460,7 @@ async function uploadAllLocalToCloud() {
       }
     }
   }
-  setSyncStatus("● Cloud synced");
+  setSyncStatus("● Online");
 }
 
 function initCloudSync() {
@@ -487,7 +487,7 @@ function initCloudSync() {
         render();
       }
     }
-    setSyncStatus("● Cloud synced");
+    setSyncStatus("● Online");
   }, err => {
     console.warn("Firestore listener error", err);
     setSyncStatus("Offline / Local");
