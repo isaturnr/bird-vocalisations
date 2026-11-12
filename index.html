@@ -142,6 +142,8 @@ body:not(.edit-mode) .form-panel {
     </div>
     <div class="header-actions">
       <span id="syncStatus" class="sync-pill">Connecting…</span>
+      <button class="secondary small" onclick="document.getElementById('importDocxFile').click()">Import Word doc</button>
+      <input id="importDocxFile" type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden onchange="importWordDoc(event)">
       <button class="secondary small" onclick="exportBackup()">Export backup</button>
       <button class="secondary small" onclick="document.getElementById('importFile').click()">Import backup</button>
       <input id="importFile" type="file" accept=".json,application/json" hidden onchange="importBackup(event)">
@@ -152,6 +154,8 @@ body:not(.edit-mode) .form-panel {
 <main id="app"></main>
 <footer>British Bird Vocalisation Library · A field reference guide</footer>
 
+<!-- Mammoth.js for parsing .docx Word tables in browser -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
 <!-- Firebase Cloud Firestore SDK (Compat CDN for standalone HTML) -->
 <script src="https://www.gstatic.com/firebasejs/11.0.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore-compat.js"></script>
@@ -295,7 +299,7 @@ async function putAudioFile(id,file) {
         type: file.type || "audio/mpeg",
         updatedAt: Date.now()
       });
-      setSyncStatus("● Online");
+      setSyncStatus("● Cloud synced");
     } catch(e) {
       console.warn("Could not upload audio to Firestore (ensure file is under 700 KB)", e);
       setSyncStatus("⚠ Audio sync error");
@@ -426,12 +430,12 @@ function save(changedSpeciesId = null) {
     const sp = db.find(s => s.id === changedSpeciesId);
     if (sp) {
       cloudDB.collection("species").doc(sp.id).set(JSON.parse(JSON.stringify(sp)))
-        .then(() => setSyncStatus("● Online"))
+        .then(() => setSyncStatus("● Cloud synced"))
         .catch(e => { console.warn(e); setSyncStatus("⚠ Sync error"); });
     }
   } else {
     Promise.all(db.map(sp => cloudDB.collection("species").doc(sp.id).set(JSON.parse(JSON.stringify(sp)))))
-      .then(() => setSyncStatus("● Online"))
+      .then(() => setSyncStatus("● Cloud synced"))
       .catch(e => { console.warn(e); setSyncStatus("⚠ Sync error"); });
   }
 }
@@ -460,12 +464,12 @@ async function uploadAllLocalToCloud() {
       }
     }
   }
-  setSyncStatus("● Online");
+  setSyncStatus("● Cloud synced");
 }
 
 function initCloudSync() {
   if (!cloudDB) {
-    setSyncStatus("Offline");
+    setSyncStatus("Offline mode");
     return;
   }
   let firstSnapshot = true;
@@ -487,7 +491,7 @@ function initCloudSync() {
         render();
       }
     }
-    setSyncStatus("● Online");
+    setSyncStatus("● Cloud synced");
   }, err => {
     console.warn("Firestore listener error", err);
     setSyncStatus("Offline / Local");
@@ -1059,6 +1063,131 @@ async function importBackup(event) {
     alert("That file could not be imported. It may not be a valid backup, or the browser may have run out of storage.");
   } finally {
     event.target.value="";
+  }
+}
+
+/* Import species table and embedded images directly from Bird Calls & Song.docx */
+async function importWordDoc(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  try {
+    setSyncStatus("Reading Word doc…");
+    const arrayBuffer = await file.arrayBuffer();
+    const result = await mammoth.convertToHtml({ arrayBuffer });
+    const doc = new DOMParser().parseFromString(result.value, "text/html");
+    const rows = [...doc.querySelectorAll("table tr")];
+    if (rows.length < 2) throw new Error("No table found in the Word document.");
+
+    let added = 0, updated = 0;
+    const cleanCell = (el) => {
+      if (!el) return "";
+      const clone = el.cloneNode(true);
+      clone.querySelectorAll("img").forEach(img => img.remove());
+      return clone.textContent.replace(/\s+\n/g, "\n").trim();
+    };
+    const isEmptyOrNA = (str) => !str || /^n\/?a$/i.test(str) || /^page \d+/i.test(str);
+
+    for (let i = 1; i < rows.length; i++) {
+      const cells = [...rows[i].querySelectorAll("td, th")];
+      if (cells.length < 2) continue;
+
+      const name = cleanCell(cells[0]);
+      const btoCode = cleanCell(cells[1]);
+      const songDesc = cleanCell(cells[2]);
+      const songMnem = cleanCell(cells[3]);
+      const callDesc = cleanCell(cells[4]);
+      const callMnem = cleanCell(cells[5]);
+      const notes = cleanCell(cells[6]);
+      const habitat = cleanCell(cells[7]);
+
+      if (!name || (!btoCode && isEmptyOrNA(songDesc) && isEmptyOrNA(callDesc))) continue;
+
+      let photo = "";
+      const imgEl = cells[0].querySelector("img");
+      if (imgEl && imgEl.src) {
+        try {
+          const res = await fetch(imgEl.src);
+          const blob = await res.blob();
+          photo = await compressImage(new File([blob], "bird.jpg", { type: blob.type || "image/jpeg" }));
+        } catch (e) { console.warn("Skipped image for", name, e); }
+      }
+
+      const newVocalisations = [];
+      const hasSong = !isEmptyOrNA(songDesc) || !isEmptyOrNA(songMnem);
+      const hasCall = !isEmptyOrNA(callDesc) || !isEmptyOrNA(callMnem);
+
+      if (hasSong) {
+        newVocalisations.push({
+          id: uid(),
+          category: "Song",
+          name: "Typical song",
+          description: isEmptyOrNA(songDesc) ? "" : songDesc,
+          mnemonic: isEmptyOrNA(songMnem) ? "" : songMnem,
+          variation: "",
+          context: "",
+          notes: !hasCall ? notes : "",
+          recordings: []
+        });
+      }
+      if (hasCall) {
+        newVocalisations.push({
+          id: uid(),
+          category: "Contact call",
+          name: "Calls",
+          description: isEmptyOrNA(callDesc) ? "" : callDesc,
+          mnemonic: isEmptyOrNA(callMnem) ? "" : callMnem,
+          variation: "",
+          context: "",
+          notes: notes,
+          recordings: []
+        });
+      } else if (!hasSong && notes) {
+        newVocalisations.push({
+          id: uid(),
+          category: "Other",
+          name: "Identification notes",
+          description: "",
+          mnemonic: "",
+          variation: "",
+          context: "",
+          notes: notes,
+          recordings: []
+        });
+      }
+
+      const existing = db.find(s => s.name.toLowerCase() === name.toLowerCase());
+      if (existing) {
+        if (btoCode && !existing.btoCode) existing.btoCode = btoCode;
+        if (habitat && !existing.habitat) existing.habitat = habitat;
+        if (photo && !existing.photo) existing.photo = photo;
+        if (existing.vocalisations.length === 0 && newVocalisations.length > 0) {
+          existing.vocalisations = newVocalisations;
+        }
+        updated++;
+      } else {
+        db.push({
+          id: uid(),
+          name,
+          scientificName: "",
+          btoCode,
+          habitat,
+          photo,
+          vocalisations: newVocalisations
+        });
+        added++;
+      }
+    }
+
+    sortDatabaseAlphabetically();
+    save();
+    render();
+    alert(`Word import complete: ${added} new species added, ${updated} existing species updated.`);
+  } catch (e) {
+    console.error(e);
+    alert("Could not import Word document: " + e.message);
+    setSyncStatus("● Cloud synced");
+  } finally {
+    event.target.value = "";
   }
 }
 
