@@ -33,6 +33,11 @@ main{max-width:1250px;margin:32px auto;padding:0 24px 60px}
 .search{position:relative;flex:1;min-width:220px;max-width:480px}
 .search input{width:100%;padding:13px 15px 13px 40px;border:1px solid var(--line);border-radius:10px;background:white}
 .search:before{content:"⌕";position:absolute;left:14px;top:6px;font-size:23px;color:var(--muted)}
+.filter-row{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px;align-items:center}
+.filter-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-right:4px}
+.filter-pill{background:white;color:var(--ink);border:1px solid var(--line);border-radius:20px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer}
+.filter-pill:hover{background:var(--green-light);border-color:#c5d4c5}
+.filter-pill.active{background:var(--green-dark);color:white;border-color:var(--green-dark)}
 .eyebrow{color:var(--green);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.4px}
 h2,h3,h4{font-family:Georgia,serif;font-weight:normal}
 h2{font-size:29px;margin:5px 0}
@@ -46,8 +51,13 @@ h3{font-size:21px;margin:0 0 8px}
 .species-card-content{padding:17px}
 .species-card h3{margin:0 0 2px}
 .scientific{font-family:Georgia,serif;font-style:italic;color:var(--muted);font-size:14px}
-.species-meta{display:flex;gap:8px;align-items:center;margin-top:13px;flex-wrap:wrap}
+.species-meta{display:flex;gap:6px;align-items:center;margin-top:13px;flex-wrap:wrap}
 .tag{background:var(--green-light);color:var(--green-dark);padding:4px 8px;border-radius:5px;font-size:11px;font-weight:700}
+.tag.subtle{background:#f0f1ea;color:#536057}
+.tag.status-resident{background:#e3efe5;color:#2c5234}
+.tag.status-summer{background:#fbf2d5;color:#745812}
+.tag.status-winter{background:#e2edf5;color:#274c68}
+.tag.status-passage{background:#ece9f2;color:#4a3d63}
 .count{font-size:12px;color:var(--muted)}
 .back{margin-bottom:20px}
 .species-hero{background:var(--paper);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:grid;grid-template-columns:minmax(220px,36%) 1fr;margin-bottom:27px}
@@ -164,6 +174,27 @@ body:not(.edit-mode) .form-panel {
 const STORAGE_KEY = "birdDatabase";
 const AUDIO_DB_NAME = "birdDatabaseFiles";
 const AUDIO_STORE = "audio";
+const BIRD_GROUPS = [
+  "Tits",
+  "Finches",
+  "Thrushes",
+  "Warblers",
+  "Corvids",
+  "Waders",
+  "Gulls",
+  "Ducks & geese",
+  "Pigeons & doves",
+  "Raptors & owls",
+  "Woodpeckers",
+  "Other"
+];
+const UK_STATUSES = [
+  "Resident",
+  "Summer migrant",
+  "Winter visitor",
+  "Passage migrant"
+];
+
 const app = document.getElementById("app");
 const syncStatusEl = document.getElementById("syncStatus");
 
@@ -200,6 +231,8 @@ let editingVocalisation = null;
 let editingSpecies = false;
 let addingSpecies = false;
 let searchTerm = "";
+let selectedGroup = "All";
+let selectedStatus = "All";
 let audioObjectUrls = [];
 
 function sortDatabaseAlphabetically() {
@@ -213,6 +246,16 @@ function esc(value) {
   return String(value ?? "").replace(/[&<>"']/g, c => ({
     "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
   }[c]));
+}
+
+function statusBadgeHTML(status) {
+  if (!status) return "";
+  const cls = status === "Resident" ? "status-resident"
+    : status === "Summer migrant" ? "status-summer"
+    : status === "Winter visitor" ? "status-winter"
+    : status === "Passage migrant" ? "status-passage"
+    : "subtle";
+  return `<span class="tag ${cls}">${esc(status)}</span>`;
 }
 
 /* Automatically turn mentions of other species in the database into clickable links */
@@ -366,15 +409,15 @@ function loadDatabase() {
     }
   } catch(e) { console.warn("Could not load saved database",e); }
   const initial = [
-    starter("Marsh Tit","Poecile palustris","MT"),
-    starter("Blue Tit","Cyanistes caeruleus","BT"),
-    starter("Great Tit","Parus major","GT")
+    starter("Marsh Tit","Poecile palustris","MT","Tits","Resident"),
+    starter("Blue Tit","Cyanistes caeruleus","BT","Tits","Resident"),
+    starter("Great Tit","Parus major","GT","Tits","Resident")
   ];
   initial.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
   return initial;
 }
-function starter(name,scientificName,btoCode) {
-  return {id:uid(),name,scientificName,btoCode,habitat:"",photo:"",photoSourceUrl:"",vocalisations:[]};
+function starter(name,scientificName,btoCode,group="",status="") {
+  return {id:uid(),name,scientificName,btoCode,group,status,habitat:"",photo:"",photoSourceUrl:"",vocalisations:[]};
 }
 function normaliseSpecies(s) {
   const vocalisations = s.vocalisations || s.vocalizations || [];
@@ -383,6 +426,8 @@ function normaliseSpecies(s) {
     name:s.name || s.commonName || "Unnamed species",
     scientificName:s.scientificName || s.scientific_name || "",
     btoCode:s.btoCode || s.bto || s.code || "",
+    group:s.group || s.family || "",
+    status:s.status || s.seasonality || "",
     habitat:s.habitat || "",
     photo:s.photo || s.image || "",
     photoSourceUrl:s.photoSourceUrl || "",
@@ -515,12 +560,54 @@ function openSpecies(id) {
   editingSpecies = false;
   render();
 }
+function setGroupFilter(group) {
+  selectedGroup = group;
+  renderLibrary();
+}
+function setStatusFilter(status) {
+  selectedStatus = status;
+  renderLibrary();
+}
 function render() {
   revokeAudioUrls();
   if (!selectedSpecies) renderLibrary();
   else renderSpecies();
 }
 function renderLibrary() {
+  const usedGroups = new Set(db.map(s => s.group).filter(Boolean));
+  const availableGroups = BIRD_GROUPS.filter(g => usedGroups.has(g));
+  if (selectedGroup !== "All" && !usedGroups.has(selectedGroup)) {
+    selectedGroup = "All";
+  }
+
+  const usedStatuses = new Set(db.map(s => s.status).filter(Boolean));
+  const availableStatuses = UK_STATUSES.filter(st => usedStatuses.has(st));
+  if (selectedStatus !== "All" && !usedStatuses.has(selectedStatus)) {
+    selectedStatus = "All";
+  }
+
+  const groupBarHTML = availableGroups.length
+    ? `<div class="filter-row">
+        <span class="filter-label">Group:</span>
+        <button type="button" class="filter-pill ${selectedGroup === "All" ? "active" : ""}" onclick="setGroupFilter('All')">All</button>
+        ${availableGroups.map(g => {
+          const count = db.filter(s => s.group === g).length;
+          return `<button type="button" class="filter-pill ${selectedGroup === g ? "active" : ""}" onclick="setGroupFilter('${esc(g)}')">${esc(g)} (${count})</button>`;
+        }).join("")}
+      </div>`
+    : "";
+
+  const statusBarHTML = availableStatuses.length
+    ? `<div class="filter-row">
+        <span class="filter-label">Status:</span>
+        <button type="button" class="filter-pill ${selectedStatus === "All" ? "active" : ""}" onclick="setStatusFilter('All')">All</button>
+        ${availableStatuses.map(st => {
+          const count = db.filter(s => s.status === st).length;
+          return `<button type="button" class="filter-pill ${selectedStatus === st ? "active" : ""}" onclick="setStatusFilter('${esc(st)}')">${esc(st)} (${count})</button>`;
+        }).join("")}
+      </div>`
+    : "";
+
   app.innerHTML = `
     <div class="toolbar">
       <div>
@@ -534,6 +621,8 @@ function renderLibrary() {
       <input placeholder="Search common name, scientific name or BTO code..." value="${esc(searchTerm)}"
         oninput="searchTerm=this.value;renderSpeciesGrid()">
     </div>
+    ${groupBarHTML}
+    ${statusBarHTML}
     ${addingSpecies ? speciesFormHTML() : ""}
     <div style="height:20px"></div>
     <div id="speciesList"></div>
@@ -544,12 +633,15 @@ function renderLibrary() {
 function renderSpeciesGrid() {
   const container = document.getElementById("speciesList");
   if (!container) return;
-  const filtered = db.filter(s =>
-    [s.name, s.scientificName, s.btoCode].join(" ").toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filtered = db.filter(s => {
+    const matchesGroup = selectedGroup === "All" || s.group === selectedGroup;
+    const matchesStatus = selectedStatus === "All" || s.status === selectedStatus;
+    const matchesSearch = [s.name, s.scientificName, s.btoCode, s.group, s.status].join(" ").toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesGroup && matchesStatus && matchesSearch;
+  });
   container.innerHTML = filtered.length
     ? `<div class="species-grid">${filtered.map(speciesCard).join("")}</div>`
-    : `<div class="empty">No species found. Try another search or add a species.</div>`;
+    : `<div class="empty">No species found. Try another search, clear the filters, or add a species.</div>`;
 }
 function speciesCard(s) {
   return `<article class="species-card" onclick="openSpecies('${s.id}')">
@@ -559,6 +651,8 @@ function speciesCard(s) {
       <div class="scientific">${esc(s.scientificName)}</div>
       <div class="species-meta">
         ${s.btoCode ? `<span class="tag">BTO: ${esc(s.btoCode)}</span>` : ""}
+        ${statusBadgeHTML(s.status)}
+        ${s.group ? `<span class="tag subtle">${esc(s.group)}</span>` : ""}
         <span class="count">${s.vocalisations.length} vocalisation${s.vocalisations.length===1?"":"s"}</span>
       </div>
     </div>
@@ -575,6 +669,18 @@ function speciesFormHTML(s=null) {
           <input name="scientificName" value="${esc(s?.scientificName || "")}" placeholder="e.g. Cyanistes caeruleus"></div>
         <div class="field"><label>BTO:</label>
           <input name="btoCode" value="${esc(s?.btoCode || "")}" placeholder="e.g. BT"></div>
+        <div class="field"><label>Group / family</label>
+          <select name="group">
+            <option value="">— Select group —</option>
+            ${BIRD_GROUPS.map(g => `<option value="${esc(g)}" ${s?.group === g ? "selected" : ""}>${esc(g)}</option>`).join("")}
+          </select>
+        </div>
+        <div class="field"><label>UK status</label>
+          <select name="status">
+            <option value="">— Select status —</option>
+            ${UK_STATUSES.map(st => `<option value="${esc(st)}" ${s?.status === st ? "selected" : ""}>${esc(st)}</option>`).join("")}
+          </select>
+        </div>
         <div class="field"><label>Habitat</label>
           <input name="habitat" value="${esc(s?.habitat || "")}" placeholder="Typical habitats"></div>
         <div class="field full"><label>Species photograph</label>
@@ -610,6 +716,8 @@ async function saveSpecies(event,id) {
     name:data.get("name").trim(),
     scientificName:data.get("scientificName").trim(),
     btoCode:data.get("btoCode").trim(),
+    group:data.get("group").trim(),
+    status:data.get("status").trim(),
     habitat:data.get("habitat").trim(),
     photo,
     photoSourceUrl:data.get("photoSourceUrl").trim()
@@ -618,7 +726,7 @@ async function saveSpecies(event,id) {
   if(id) {
     Object.assign(db.find(s=>s.id===id),fields);
   } else {
-    const created = {...starter(fields.name,fields.scientificName,fields.btoCode),...fields};
+    const created = {...starter(fields.name,fields.scientificName,fields.btoCode,fields.group,fields.status),...fields};
     targetId = created.id;
     db.push(created);
   }
@@ -668,7 +776,11 @@ function renderSpecies() {
         <div class="eyebrow">Species profile</div>
         <h2>${esc(s.name)}</h2>
         <div class="scientific">${esc(s.scientificName)}</div>
-        ${s.btoCode ? `<div style="margin-top:12px"><span class="tag">BTO: ${esc(s.btoCode)}</span></div>` : ""}
+        ${(s.btoCode || s.status || s.group) ? `<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+          ${s.btoCode ? `<span class="tag">BTO: ${esc(s.btoCode)}</span>` : ""}
+          ${statusBadgeHTML(s.status)}
+          ${s.group ? `<span class="tag subtle">${esc(s.group)}</span>` : ""}
+        </div>` : ""}
         ${s.habitat ? `<div class="hero-description"><strong>Typical habitats</strong><br>${esc(s.habitat)}</div>` : ""}
         ${s.photoSourceUrl ? `<div class="field-note" style="margin-top:10px">Photo source: <a href="${esc(s.photoSourceUrl)}" target="_blank" rel="noopener">View original image</a></div>` : ""}
         <div class="hero-actions">
@@ -1176,6 +1288,8 @@ async function importWordDoc(event) {
           name,
           scientificName: "",
           btoCode,
+          group: "",
+          status: "",
           habitat,
           photo,
           photoSourceUrl: "",
