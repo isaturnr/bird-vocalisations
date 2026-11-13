@@ -30,14 +30,12 @@ header{background:var(--green-dark);color:white;padding:20px 5%}
 .sync-pill{font-size:12px;color:#d5dfd5;padding:4px 8px;border-radius:6px;background:rgba(255,255,255,.1)}
 main{max-width:1250px;margin:32px auto;padding:0 24px 60px}
 .toolbar{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-bottom:25px;flex-wrap:wrap}
-.search{position:relative;flex:1;min-width:220px;max-width:480px}
-.search input{width:100%;padding:13px 15px 13px 40px;border:1px solid var(--line);border-radius:10px;background:white}
-.search:before{content:"⌕";position:absolute;left:14px;top:6px;font-size:23px;color:var(--muted)}
-.filter-row{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px;align-items:center}
-.filter-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-right:4px}
-.filter-pill{background:white;color:var(--ink);border:1px solid var(--line);border-radius:20px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer}
-.filter-pill:hover{background:var(--green-light);border-color:#c5d4c5}
-.filter-pill.active{background:var(--green-dark);color:white;border-color:var(--green-dark)}
+.search-bar-row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.search{position:relative;flex:1;min-width:240px}
+.search input{width:100%;padding:12px 15px 12px 40px;border:1px solid var(--line);border-radius:10px;background:white}
+.search:before{content:"⌕";position:absolute;left:14px;top:5px;font-size:23px;color:var(--muted)}
+.filter-select{padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:white;color:var(--ink);min-width:175px;cursor:pointer}
+.filter-select:focus,.search input:focus{outline:2px solid #c5d4c5;border-color:var(--green)}
 .eyebrow{color:var(--green);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.4px}
 h2,h3,h4{font-family:Georgia,serif;font-weight:normal}
 h2{font-size:29px;margin:5px 0}
@@ -118,6 +116,8 @@ body:not(.edit-mode) .form-panel {
 @media(max-width:650px){
   main{padding:0 14px;margin-top:22px}
   .header-inner{align-items:flex-start;flex-direction:column}
+  .search-bar-row{flex-direction:column;align-items:stretch}
+  .filter-select{width:100%}
   .species-hero{grid-template-columns:1fr}
   .species-hero img,.hero-placeholder{height:210px;min-height:210px}
   .hero-content{padding:20px}
@@ -560,14 +560,6 @@ function openSpecies(id) {
   editingSpecies = false;
   render();
 }
-function setGroupFilter(group) {
-  selectedGroup = group;
-  renderLibrary();
-}
-function setStatusFilter(status) {
-  selectedStatus = status;
-  renderLibrary();
-}
 function render() {
   revokeAudioUrls();
   if (!selectedSpecies) renderLibrary();
@@ -586,28 +578,6 @@ function renderLibrary() {
     selectedStatus = "All";
   }
 
-  const groupBarHTML = availableGroups.length
-    ? `<div class="filter-row">
-        <span class="filter-label">Group:</span>
-        <button type="button" class="filter-pill ${selectedGroup === "All" ? "active" : ""}" onclick="setGroupFilter('All')">All</button>
-        ${availableGroups.map(g => {
-          const count = db.filter(s => s.group === g).length;
-          return `<button type="button" class="filter-pill ${selectedGroup === g ? "active" : ""}" onclick="setGroupFilter('${esc(g)}')">${esc(g)} (${count})</button>`;
-        }).join("")}
-      </div>`
-    : "";
-
-  const statusBarHTML = availableStatuses.length
-    ? `<div class="filter-row">
-        <span class="filter-label">Status:</span>
-        <button type="button" class="filter-pill ${selectedStatus === "All" ? "active" : ""}" onclick="setStatusFilter('All')">All</button>
-        ${availableStatuses.map(st => {
-          const count = db.filter(s => s.status === st).length;
-          return `<button type="button" class="filter-pill ${selectedStatus === st ? "active" : ""}" onclick="setStatusFilter('${esc(st)}')">${esc(st)} (${count})</button>`;
-        }).join("")}
-      </div>`
-    : "";
-
   app.innerHTML = `
     <div class="toolbar">
       <div>
@@ -617,12 +587,26 @@ function renderLibrary() {
       </div>
       <button onclick="showSpeciesForm()">＋ Add species</button>
     </div>
-    <div class="search">
-      <input placeholder="Search common name, scientific name or BTO code..." value="${esc(searchTerm)}"
-        oninput="searchTerm=this.value;renderSpeciesGrid()">
+    <div class="search-bar-row">
+      <div class="search">
+        <input placeholder="Search common name, scientific name or BTO code..." value="${esc(searchTerm)}"
+          oninput="searchTerm=this.value;renderSpeciesGrid()">
+      </div>
+      <select class="filter-select" aria-label="Filter by group" onchange="selectedGroup=this.value;renderSpeciesGrid()">
+        <option value="All">All groups (${db.length})</option>
+        ${availableGroups.map(g => {
+          const count = db.filter(s => s.group === g).length;
+          return `<option value="${esc(g)}" ${selectedGroup === g ? "selected" : ""}>${esc(g)} (${count})</option>`;
+        }).join("")}
+      </select>
+      <select class="filter-select" aria-label="Filter by UK status" onchange="selectedStatus=this.value;renderSpeciesGrid()">
+        <option value="All">All statuses (${db.length})</option>
+        ${availableStatuses.map(st => {
+          const count = db.filter(s => s.status === st).length;
+          return `<option value="${esc(st)}" ${selectedStatus === st ? "selected" : ""}>${esc(st)} (${count})</option>`;
+        }).join("")}
+      </select>
     </div>
-    ${groupBarHTML}
-    ${statusBarHTML}
     ${addingSpecies ? speciesFormHTML() : ""}
     <div style="height:20px"></div>
     <div id="speciesList"></div>
@@ -641,7 +625,7 @@ function renderSpeciesGrid() {
   });
   container.innerHTML = filtered.length
     ? `<div class="species-grid">${filtered.map(speciesCard).join("")}</div>`
-    : `<div class="empty">No species found. Try another search, clear the filters, or add a species.</div>`;
+    : `<div class="empty">No species found. Try another search, reset the dropdown filters, or add a species.</div>`;
 }
 function speciesCard(s) {
   return `<article class="species-card" onclick="openSpecies('${s.id}')">
