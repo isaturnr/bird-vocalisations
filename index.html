@@ -886,7 +886,7 @@ function formatTime(seconds) {
 function showVocalForm() {editingVocalisation="new";renderSpecies();}
 function editVocalisation(id) {editingVocalisation=id;renderSpecies();}
 function vocalFormHTML(v) {
-  const cats=["Song","Contact call","Alarm call","Flight call","Begging call","Juvenile call","Mobbing call","Other"];
+  const cats=["Song","Call"];
   const recordings=v?.recordings || [];
   return `<section class="form-panel">
     <h3>${v ? "Edit vocalisation" : "Add a vocalisation"}</h3>
